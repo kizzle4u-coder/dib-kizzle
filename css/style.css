@@ -1,0 +1,22 @@
+body{
+  margin:0;
+  background:#111;
+  color:#eee;
+  font-family:system-ui,Arial;
+  overflow:hidden;
+}
+
+#ui{
+  position:absolute;
+  top:10px;
+  left:10px;
+  display:flex;
+  gap:10px;
+  z-index:10;
+}
+
+canvas{
+  width:100vw;
+  height:100vh;
+  display:block;
+}

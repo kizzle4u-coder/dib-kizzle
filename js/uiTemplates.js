@@ -5,17 +5,17 @@ export function renderTemplatePicker(onSelect){
   sel.id = "templatePicker";
 
   const options = [
-    { id: "kizzle", name: "Smart DJ – Inspired by Kizzle" },
-    { id: "verse-light", name: "Verse – Light" },
-    { id: "hook-dense", name: "Hook – Dense" }
+    { id: "kizzle",       name: "Smart DJ – Inspired by Kizzle" },
+    { id: "verse-light",  name: "Verse – Light" },
+    { id: "hook-dense",   name: "Hook – Dense" }
   ];
 
-  options.forEach(t=>{
+  options.forEach(t => {
     const opt = new Option(t.name, t.id);
     sel.add(opt);
   });
 
-  sel.onchange = ()=> onSelect(sel.value);
+  sel.onchange = () => onSelect(sel.value);
   return sel;
 }
 

@@ -1,12 +1,22 @@
-import * as THREE from "./three.min.js";
-import { renderTemplatePicker, renderSaveTemplateBtn, renderExportBtn } from "./uiTemplates.js";
+// Load THREE from CDN (this replaces three.min.js completely)
+import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
+
+// UI helper imports
+import { 
+  renderTemplatePicker, 
+  renderSaveTemplateBtn, 
+  renderExportBtn 
+} from "./uiTemplates.js";
+
 import { getTemplates } from "./userTemplates.js";
 
 let renderer, scene, camera, cone;
 
 async function init(){
 
-  // UI container
+  // =========================
+  // UI BAR
+  // =========================
   const ui = document.getElementById("ui");
 
   // Template Picker
@@ -16,7 +26,7 @@ async function init(){
     })
   );
 
-  // Save Template
+  // Save Button
   ui.appendChild(
     renderSaveTemplateBtn(()=>{
       console.log("Save current chops clicked");
@@ -30,12 +40,17 @@ async function init(){
     })
   );
 
-  // THREE SETUP
+
+  // =========================
+  // 3D SPEAKER SCENE
+  // =========================
   const canvas = document.getElementById("canvas");
+
   renderer = new THREE.WebGLRenderer({ canvas, alpha:true });
   renderer.setSize(window.innerWidth, window.innerHeight);
 
   scene = new THREE.Scene();
+
   camera = new THREE.PerspectiveCamera(
     45,
     window.innerWidth / window.innerHeight,
@@ -44,6 +59,7 @@ async function init(){
   );
   camera.position.set(0,1,3);
 
+  // Lights
   const amb = new THREE.AmbientLight(0xffffff, 0.6);
   scene.add(amb);
 

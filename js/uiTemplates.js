@@ -1,22 +1,32 @@
-export function renderTemplatePicker(onSelect) {
+// Simple UI helpers with no external JSON
+
+export function renderTemplatePicker(onSelect){
   const sel = document.createElement("select");
   sel.id = "templatePicker";
 
-  const opt = new Option("Smart DJ – Inspired by Kizzle", "default");
-  sel.add(opt);
+  const options = [
+    { id: "kizzle", name: "Smart DJ – Inspired by Kizzle" },
+    { id: "verse-light", name: "Verse – Light" },
+    { id: "hook-dense", name: "Hook – Dense" }
+  ];
 
-  sel.onchange = () => onSelect(sel.value);
+  options.forEach(t=>{
+    const opt = new Option(t.name, t.id);
+    sel.add(opt);
+  });
+
+  sel.onchange = ()=> onSelect(sel.value);
   return sel;
 }
 
-export function renderSaveTemplateBtn(onSave) {
+export function renderSaveTemplateBtn(onSave){
   const btn = document.createElement("button");
   btn.textContent = "+ Save current";
   btn.onclick = onSave;
   return btn;
 }
 
-export function renderExportBtn(onExport) {
+export function renderExportBtn(onExport){
   const btn = document.createElement("button");
   btn.textContent = "Export ⬇";
   btn.onclick = onExport;

@@ -18,8 +18,12 @@ let audio = null;
 
 async function init(){
 
-  // ---------------- UI BAR ----------------
+  // ---------- UI BAR ----------
   const ui = document.getElementById("ui");
+  if (!ui) {
+    console.error("#ui element not found");
+    return;
+  }
 
   ui.appendChild(
     renderTemplatePicker(templateId => {
@@ -39,8 +43,12 @@ async function init(){
     })
   );
 
-  // ---------------- RENDERER & SCENE ----------------
+  // ---------- RENDERER & SCENE ----------
   const canvas = document.getElementById("canvas");
+  if (!canvas) {
+    console.error("#canvas not found");
+    return;
+  }
 
   renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -64,10 +72,10 @@ async function init(){
   dir.position.set(2, 2, 2);
   scene.add(dir);
 
-  // ---------------- LOAD WOOFER MODEL ----------------
+  // ---------- LOAD WOOFER MODEL ----------
   const gltfLoader = new GLTFLoader();
   gltfLoader.load(
-    "./woofer.glb",          // file is in /js/ relative to main.js
+    "./woofer.glb",      // file is /js/woofer.glb
     gltf => {
       wooferModel = gltf.scene;
 
@@ -75,7 +83,6 @@ async function init(){
       wooferModel.rotation.set(0, 0, 0);
       wooferModel.scale.set(1, 1, 1);
 
-      // Try to find the cone mesh by name
       wooferModel.traverse(obj => {
         if (obj.isMesh) {
           obj.castShadow = true;
@@ -92,7 +99,7 @@ async function init(){
         }
       });
 
-      // Fallback: if we didn't find a cone, just pick first mesh
+      // Fallback: pick first mesh if cone not found
       if (!coneMesh) {
         wooferModel.traverse(obj => {
           if (obj.isMesh && !coneMesh) coneMesh = obj;
@@ -100,12 +107,13 @@ async function init(){
       }
 
       scene.add(wooferModel);
+      console.log("Woofer loaded");
     },
     undefined,
     err => {
       console.error("Error loading woofer.glb:", err);
 
-      // Fallback placeholder so screen isn't empty
+      // Fallback placeholder
       const geo = new THREE.CylinderGeometry(0.8, 0.8, 0.4, 64);
       const mat = new THREE.MeshStandardMaterial({ color: 0x222222 });
       coneMesh = new THREE.Mesh(geo, mat);
@@ -113,7 +121,7 @@ async function init(){
     }
   );
 
-  // ---------------- AUDIO ----------------
+  // ---------- AUDIO ----------
   const listener = new THREE.AudioListener();
   camera.add(listener);
 
@@ -121,17 +129,18 @@ async function init(){
   const audioLoader = new THREE.AudioLoader();
 
   audioLoader.load(
-    "./track.mp3",  // must exist as /js/track.mp3
+    "./track.mp3",    // must exist as /js/track.mp3
     buffer => {
       audio.setBuffer(buffer);
       audio.setLoop(true);
       audio.setVolume(0.9);
 
-      // Browser may require a click before play; this is OK.
-      try { audio.play(); } catch(e) { console.log("Autoplay blocked"); }
+      try { audio.play(); }
+      catch(e) { console.log("Autoplay blocked until click"); }
 
       analyser = new THREE.AudioAnalyser(audio, 32);
       dataArray = new Uint8Array(analyser.analyser.frequencyBinCount);
+      console.log("Audio loaded");
     },
     undefined,
     err => {
@@ -139,7 +148,7 @@ async function init(){
     }
   );
 
-  // ---------------- RESIZE ----------------
+  // ---------- RESIZE ----------
   window.addEventListener("resize", () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
@@ -149,19 +158,19 @@ async function init(){
   animate();
 }
 
-// ---------------- ANIMATION LOOP ----------------
+// ---------- ANIMATION LOOP ----------
 function animate(){
   requestAnimationFrame(animate);
 
   // Bass → cone motion
   if (analyser && coneMesh) {
     analyser.analyser.getByteFrequencyData(dataArray);
-    let bass = (dataArray[0] + dataArray[1] + dataArray[2]) / 3;
-    let push = THREE.MathUtils.mapLinear(bass, 0, 255, 0, 0.12);
+    const bass = (dataArray[0] + dataArray[1] + dataArray[2]) / 3;
+    const push = THREE.MathUtils.mapLinear(bass, 0, 255, 0, 0.12);
     coneMesh.position.z = -push;
   }
 
-  // Slow spin of whole model
+  // Slow spin
   if (wooferModel) {
     wooferModel.rotation.y += 0.002;
   }

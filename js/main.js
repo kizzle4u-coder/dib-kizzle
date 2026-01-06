@@ -1,55 +1,53 @@
-// THREE from CDN
+// Load THREE + GLTFLoader from CDN
 import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
 import { GLTFLoader } from "https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
 
-// UI imports
-import { 
-  renderTemplatePicker, 
-  renderSaveTemplateBtn, 
-  renderExportBtn 
+import {
+  renderTemplatePicker,
+  renderSaveTemplateBtn,
+  renderExportBtn
 } from "./uiTemplates.js";
 
 let renderer, scene, camera;
 let wooferModel = null;
 let coneMesh = null;
 
-let analyser, dataArray, audio;
+let analyser = null;
+let dataArray = null;
+let audio = null;
 
-// ========================
-// INIT
-// ========================
 async function init(){
 
-  // ---------- UI ----------
+  // ---------------- UI BAR ----------------
   const ui = document.getElementById("ui");
 
   ui.appendChild(
-    renderTemplatePicker(templateId=>{
+    renderTemplatePicker(templateId => {
       console.log("Template selected:", templateId);
     })
   );
 
   ui.appendChild(
-    renderSaveTemplateBtn(()=>{
+    renderSaveTemplateBtn(() => {
       console.log("Save current chops clicked");
     })
   );
 
   ui.appendChild(
-    renderExportBtn(()=>{
-      console.log("Export now");
+    renderExportBtn(() => {
+      console.log("Export clicked");
     })
   );
 
-
-  // ---------- SCENE ----------
+  // ---------------- RENDERER & SCENE ----------------
   const canvas = document.getElementById("canvas");
 
-  renderer = new THREE.WebGLRenderer({ canvas, alpha:true, antialias:true });
+  renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(devicePixelRatio);
+  renderer.setPixelRatio(window.devicePixelRatio || 1);
 
   scene = new THREE.Scene();
+  scene.background = null;
 
   camera = new THREE.PerspectiveCamera(
     45,
@@ -59,71 +57,90 @@ async function init(){
   );
   camera.position.set(0, 1.2, 3.2);
 
-
-  // ---------- LIGHTS ----------
+  // Lights
   scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 
   const dir = new THREE.DirectionalLight(0xffffff, 1.2);
-  dir.position.set(2,2,2);
+  dir.position.set(2, 2, 2);
   scene.add(dir);
 
+  // ---------------- LOAD WOOFER MODEL ----------------
+  const gltfLoader = new GLTFLoader();
+  gltfLoader.load(
+    "./woofer.glb",          // file is in /js/ relative to main.js
+    gltf => {
+      wooferModel = gltf.scene;
 
-  // ---------- LOAD WOOFER ----------
-  const loader = new GLTFLoader();
+      wooferModel.position.set(0, 0, 0);
+      wooferModel.rotation.set(0, 0, 0);
+      wooferModel.scale.set(1, 1, 1);
 
-  loader.load("./woofer.glb", gltf => {
+      // Try to find the cone mesh by name
+      wooferModel.traverse(obj => {
+        if (obj.isMesh) {
+          obj.castShadow = true;
+          obj.receiveShadow = true;
 
-    wooferModel = gltf.scene;
-
-    wooferModel.position.set(0,0,0);
-    wooferModel.rotation.set(0,0,0);
-    wooferModel.scale.set(1,1,1);
-
-    // try to find a cone-like object by name
-    wooferModel.traverse(o=>{
-      if(o.isMesh){
-        o.castShadow = true;
-        o.receiveShadow = true;
-
-        const name = o.name.toLowerCase();
-        if(
-          name.includes("cone") || 
-          name.includes("woofer") ||
-          name.includes("dust")
-        ){
-          coneMesh = o;
+          const n = obj.name.toLowerCase();
+          if (
+            n.includes("cone") ||
+            n.includes("woofer") ||
+            n.includes("dust")
+          ) {
+            coneMesh = obj;
+          }
         }
+      });
+
+      // Fallback: if we didn't find a cone, just pick first mesh
+      if (!coneMesh) {
+        wooferModel.traverse(obj => {
+          if (obj.isMesh && !coneMesh) coneMesh = obj;
+        });
       }
-    });
 
-    scene.add(wooferModel);
+      scene.add(wooferModel);
+    },
+    undefined,
+    err => {
+      console.error("Error loading woofer.glb:", err);
 
-  }, undefined, err=>{
-    console.error("GLB load error:", err);
-  });
+      // Fallback placeholder so screen isn't empty
+      const geo = new THREE.CylinderGeometry(0.8, 0.8, 0.4, 64);
+      const mat = new THREE.MeshStandardMaterial({ color: 0x222222 });
+      coneMesh = new THREE.Mesh(geo, mat);
+      scene.add(coneMesh);
+    }
+  );
 
-
-  // ---------- AUDIO ----------
+  // ---------------- AUDIO ----------------
   const listener = new THREE.AudioListener();
   camera.add(listener);
 
   audio = new THREE.Audio(listener);
+  const audioLoader = new THREE.AudioLoader();
 
-  const loaderAudio = new THREE.AudioLoader();
-  loaderAudio.load("./track.mp3", buffer => {
-    audio.setBuffer(buffer);
-    audio.setLoop(true);
-    audio.setVolume(0.9);
-    audio.play();
+  audioLoader.load(
+    "./track.mp3",  // must exist as /js/track.mp3
+    buffer => {
+      audio.setBuffer(buffer);
+      audio.setLoop(true);
+      audio.setVolume(0.9);
 
-    analyser = new THREE.AudioAnalyser(audio, 32);
-    dataArray = new Uint8Array(analyser.analyser.frequencyBinCount);
+      // Browser may require a click before play; this is OK.
+      try { audio.play(); } catch(e) { console.log("Autoplay blocked"); }
 
-  });
+      analyser = new THREE.AudioAnalyser(audio, 32);
+      dataArray = new Uint8Array(analyser.analyser.frequencyBinCount);
+    },
+    undefined,
+    err => {
+      console.error("Error loading track.mp3:", err);
+    }
+  );
 
-
-  // ---------- RESIZE ----------
-  window.addEventListener("resize", ()=>{
+  // ---------------- RESIZE ----------------
+  window.addEventListener("resize", () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -132,29 +149,24 @@ async function init(){
   animate();
 }
 
-
-// ========================
-// ANIMATE
-// ========================
+// ---------------- ANIMATION LOOP ----------------
 function animate(){
+  requestAnimationFrame(animate);
 
-  if(analyser && coneMesh){
-
+  // Bass → cone motion
+  if (analyser && coneMesh) {
     analyser.analyser.getByteFrequencyData(dataArray);
-
     let bass = (dataArray[0] + dataArray[1] + dataArray[2]) / 3;
-
     let push = THREE.MathUtils.mapLinear(bass, 0, 255, 0, 0.12);
-
     coneMesh.position.z = -push;
   }
 
-  if(wooferModel){
+  // Slow spin of whole model
+  if (wooferModel) {
     wooferModel.rotation.y += 0.002;
   }
 
-  renderer.render(scene,camera);
-  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
 }
 
 init();

@@ -1,4 +1,4 @@
-// Load THREE + GLTFLoader from CDN
+// Load THREE + GLTFLoader directly from CDN (no "three.min.js", no "three" package)
 import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
 import { GLTFLoader } from "https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
 
@@ -75,7 +75,7 @@ async function init(){
   // ---------- LOAD WOOFER MODEL ----------
   const gltfLoader = new GLTFLoader();
   gltfLoader.load(
-    "./woofer.glb",      // file is /js/woofer.glb
+    "./woofer.glb",            // /js/woofer.glb
     gltf => {
       wooferModel = gltf.scene;
 
@@ -99,7 +99,6 @@ async function init(){
         }
       });
 
-      // Fallback: pick first mesh if cone not found
       if (!coneMesh) {
         wooferModel.traverse(obj => {
           if (obj.isMesh && !coneMesh) coneMesh = obj;
@@ -129,14 +128,14 @@ async function init(){
   const audioLoader = new THREE.AudioLoader();
 
   audioLoader.load(
-    "./track.mp3",    // must exist as /js/track.mp3
+    "./track.mp3",           // /js/track.mp3
     buffer => {
       audio.setBuffer(buffer);
       audio.setLoop(true);
       audio.setVolume(0.9);
 
       try { audio.play(); }
-      catch(e) { console.log("Autoplay blocked until click"); }
+      catch(e) { console.log("Autoplay blocked until user interacts"); }
 
       analyser = new THREE.AudioAnalyser(audio, 32);
       dataArray = new Uint8Array(analyser.analyser.frequencyBinCount);
@@ -162,7 +161,6 @@ async function init(){
 function animate(){
   requestAnimationFrame(animate);
 
-  // Bass → cone motion
   if (analyser && coneMesh) {
     analyser.analyser.getByteFrequencyData(dataArray);
     const bass = (dataArray[0] + dataArray[1] + dataArray[2]) / 3;
@@ -170,7 +168,6 @@ function animate(){
     coneMesh.position.z = -push;
   }
 
-  // Slow spin
   if (wooferModel) {
     wooferModel.rotation.y += 0.002;
   }

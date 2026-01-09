@@ -1,15 +1,28 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Does It Bang?! – Smart DJ</title>
-  <link rel="stylesheet" href="css/style.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Does It Bang?!</title>
+  <link rel="stylesheet" href="./css/style.css" />
 </head>
 <body>
-  <div id="ui"></div>
+  <header>Does It Bang?!</header>
+
+  <div id="ui">
+    <div id="status">Booting…</div>
+    <div id="modeRow">
+      <button id="playBtn">Play</button>
+      <button id="stopBtn">Stop</button>
+      <button id="resetBtn">Reset</button>
+    </div>
+  </div>
+
   <canvas id="canvas"></canvas>
 
-  <!-- Main app script -->
-  <script type="module" src="js/main.js"></script>
+  <!-- Use local THREE (global) -->
+  <script src="./js/three.min.js"></script>
+  <!-- Plain script (no modules) -->
+  <script src="./js/main.js"></script>
 </body>
 </html>

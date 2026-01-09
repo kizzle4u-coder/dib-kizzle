@@ -1,87 +1,175 @@
-import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
-import { GLTFLoader } from "https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
+/* global THREE */
+(() => {
+  const statusEl = document.getElementById("status");
+  const bootLog = (msg) => {
+    console.log(msg);
+    statusEl.textContent = msg;
+  };
 
-let scene, camera, renderer, model;
+  bootLog("DIB_BOOT_OK v1 — DIB");
 
-init();
-animate();
+  // ---- Three.js minimal scene (no loaders, no modules) ----
+  const canvas = document.getElementById("canvas");
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(window.devicePixelRatio || 1);
 
-function init() {
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x111111);
 
-  // Scene
-  scene = new THREE.Scene();
-
-  // Camera
-  camera = new THREE.PerspectiveCamera(
+  const camera = new THREE.PerspectiveCamera(
     45,
     window.innerWidth / window.innerHeight,
     0.1,
     100
   );
   camera.position.set(0, 1, 3);
+  camera.lookAt(0, 0, 0);
 
-  // Renderer
-  const canvas = document.getElementById("canvas");
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(window.devicePixelRatio);
-
-  // Lights
-  const amb = new THREE.AmbientLight(0xffffff, 0.7);
-  scene.add(amb);
-
-  const dir = new THREE.DirectionalLight(0xffffff, 1.2);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+  const dir = new THREE.DirectionalLight(0xffffff, 1.0);
   dir.position.set(3, 3, 3);
   scene.add(dir);
 
-  // TEMP TEST OBJECT (so you always see something)
-  const geo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-  const mat = new THREE.MeshStandardMaterial({ color: 0x00ff99 });
-  const cube = new THREE.Mesh(geo, mat);
-  cube.name = "testCube";
-  scene.add(cube);
-
-  // Load woofer model
-  const loader = new GLTFLoader();
-
-  // IMPORTANT: this path must match where you uploaded woofer.glb
-  loader.load(
-    "./js/woofer.glb",
-    (gltf) => {
-      model = gltf.scene;
-      model.position.set(0, 0, 0);
-      scene.add(model);
-
-      // remove test cube when model loads
-      const temp = scene.getObjectByName("testCube");
-      if (temp) scene.remove(temp);
-
-      console.log("Woofer model loaded");
-    },
-    (xhr) => {
-      console.log(`Loading: ${(xhr.loaded / xhr.total) * 100}%`);
-    },
-    (err) => {
-      console.error("GLB load error:", err);
-    }
+  // "Woofer" placeholder: a cylinder that moves like a cone
+  const basket = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.45, 0.45, 0.12, 64),
+    new THREE.MeshStandardMaterial({ color: 0x222222 })
   );
+  scene.add(basket);
 
-  // Resize support
-  window.addEventListener("resize", onWindowResize);
-}
+  const cone = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.38, 0.38, 0.06, 64),
+    new THREE.MeshStandardMaterial({ color: 0x111111 })
+  );
+  cone.position.y = 0.04;
+  basket.add(cone);
 
-function onWindowResize() {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-}
+  // Resize handling
+  function resize() {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener("resize", resize);
+  resize();
 
-function animate() {
-  requestAnimationFrame(animate);
+  // ---- Audio: use built-in AnalyserNode (simpler than AudioWorklet) ----
+  let audioCtx = null;
+  let analyser = null;
+  let sourceNode = null;
+  let gainNode = null;
+  let audioBuffer = null;
 
-  if (model) {
-    model.rotation.y += 0.01;
+  async function ensureAudio() {
+    if (audioCtx) return;
+
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+
+    gainNode = audioCtx.createGain();
+    gainNode.gain.value = 0.8;
+
+    analyser.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    // IMPORTANT: your screenshot shows track.mp3 inside /js/
+    // If you move it later, update this path.
+    const resp = await fetch("./js/track.mp3");
+    const arr = await resp.arrayBuffer();
+    audioBuffer = await audioCtx.decodeAudioData(arr);
   }
 
-  renderer.render(scene, camera);
-}
+  function startPlayback() {
+    if (!audioCtx || !audioBuffer) return;
+
+    if (sourceNode) {
+      try { sourceNode.stop(); } catch (_) {}
+      sourceNode.disconnect();
+      sourceNode = null;
+    }
+
+    sourceNode = audioCtx.createBufferSource();
+    sourceNode.buffer = audioBuffer;
+    sourceNode.loop = true;
+    sourceNode.connect(analyser);
+    sourceNode.start();
+  }
+
+  function stopPlayback() {
+    if (gainNode && audioCtx) {
+      gainNode.gain.setTargetAtTime(0.0, audioCtx.currentTime, 0.05);
+    }
+  }
+
+  function resetGain() {
+    if (gainNode && audioCtx) {
+      gainNode.gain.setTargetAtTime(0.8, audioCtx.currentTime, 0.05);
+    }
+  }
+
+  // UI hooks
+  document.getElementById("playBtn").onclick = async () => {
+    await ensureAudio();
+    await audioCtx.resume();
+    resetGain();
+    startPlayback();
+    bootLog("Playing — no black screen");
+  };
+
+  document.getElementById("stopBtn").onclick = () => {
+    stopPlayback();
+    bootLog("Stopped (gain down)");
+  };
+
+  document.getElementById("resetBtn").onclick = () => {
+    resetGain();
+    bootLog("Reset gain");
+  };
+
+  // ---- Bass movement ----
+  const timeData = new Uint8Array(2048);
+  let pos = 0;
+  let vel = 0;
+
+  // Tunables (simple spring)
+  const excursion = 0.05;
+  const spring = 1400;
+  const damping = 40;
+
+  function getBassLevel() {
+    if (!analyser) return 0;
+    analyser.getByteTimeDomainData(timeData);
+
+    // Cheap amplitude estimate
+    let sum = 0;
+    for (let i = 0; i < timeData.length; i++) {
+      const v = (timeData[i] - 128) / 128;
+      sum += Math.abs(v);
+    }
+    const amp = sum / timeData.length; // ~0..1
+    return Math.min(amp * 1.8, 1.0);
+  }
+
+  function animate() {
+    const bass = getBassLevel();
+    const target = bass * excursion;
+
+    const force = -spring * (pos - target) - damping * vel;
+    vel += force * 0.001;
+    pos += vel * 0.001;
+
+    // clamp
+    if (pos > excursion) pos = excursion;
+    if (pos < -excursion) pos = -excursion;
+
+    cone.position.y = 0.04 + pos;
+
+    renderer.render(scene, camera);
+    requestAnimationFrame(animate);
+  }
+
+  animate();
+})();
